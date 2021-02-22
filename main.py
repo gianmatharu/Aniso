@@ -37,7 +37,7 @@ if __name__ == "__main__":
     # Apply to random vector
     noise = np.random.normal(0, 1, size=image.shape[:2])
     noise = gridsmooth(noise, 2)
-    noise /= np.sqrt(np.var(noise)) 
+    noise /= np.sqrt(np.var(noise))
     textured_noise = dtensor.smooth(noise)
 
     fig, ax = plt.subplots(nrows=1,ncols=2, figsize=(8, 4))

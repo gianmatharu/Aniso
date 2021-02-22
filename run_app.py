@@ -8,20 +8,14 @@ from plotly.subplots import make_subplots
 import plotly.graph_objects as go
 import datetime
 
-import pandas 
-
 import cv2
+import base64
 import numpy as np
 from PIL import Image
 
 from aniso.tensor import DiffusionTensor2D
 from aniso.derivatives import apply_isotropic_smoothing
 from aniso.dash_reusable_components import b64_to_numpy, b64_to_pil
-
-import pandas as pd
-import base64
-
-
 
 logo = 'test_images/aniso.png'
 encoded_logo = base64.b64encode(open(logo, 'rb').read())

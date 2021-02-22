@@ -104,8 +104,8 @@ class StructureTensor2D(object):
             ax = plt.gca()
 
         image = np.asarray(image)
-        # if image.shape != self.shape:
-        #     raise ValueError('Image does not match structure tensor dimensions.')
+        if image.shape[:2] != self.shape:
+            raise ValueError('Image does not match structure tensor dimensions.')
 
         ax.imshow(image)
 
@@ -202,47 +202,10 @@ class DiffusionTensor2D(StructureTensor2D):
 
         # normalize image
         image = image / abs(image.max())
-        (ny, nx) = image.shape
-
-        # # Initialize diffusion tensor components
-        d11 = np.zeros((ny, nx))
-        d12 = np.zeros((ny, nx))
-        d22 = np.zeros((ny, nx))
 
         # Compute gradient of scalar field using derivative filter
         Ixx, Ixy, Iyy = ski.structure_tensor(image, sigma=sigma, mode='nearest', cval=0.0)
-
-        for i in range(ny):
-            for j in range(nx):
-                A = [[Ixx[i, j], Ixy[i, j]], [Ixy[i, j], Iyy[i, j]]]
-                vals, vecs = eigsorted(A)
-
-                alpha = 0.01
-                if weighted:
-                    if vals[0] == vals[1]:
-                        lam1 = 0.5
-                        lam2 = 0.5
-                    else:
-                        linearity = vals[0] - vals[1] / vals[0]
-                        lam1 = alpha
-                        lam2 = alpha + (1-alpha)*np.exp(-1./linearity**2)
-
-                        lam_sum = lam1 + lam2
-
-                        lam1 /= lam_sum
-                        lam2 /= lam_sum
-                else: 
-                    lam1 = 0.05
-                    lam2 = 0.95
-
-                # eigen-decomposition of diffusion tensor
-                D = lam1 * np.outer(vecs[:, 0], vecs[:, 0]) + \
-                    lam2 * np.outer(vecs[:, -1], vecs[:, -1])
-
-                # Assign components
-                d11[i][j] = D[0][0]
-                d12[i][j] = D[0][1]
-                d22[i][j] = D[1][1]
+        d11, d12, d22 = _get_diffusion_tensor(Ixx, Ixy, Iyy, weighted=weighted)
 
         return d11, d12, d22
 
@@ -309,3 +272,96 @@ def _draw_eig_ellipse(pos, vals, vecs, scale, **kwargs):
 
     return ellip
 
+def _get_diffusion_tensor(Ixx, Ixy, Iyy, weighted=False):
+    """ Compute diffusion tensor with numpy broadcasting
+    """
+
+    trace = Ixx + Iyy 
+    det = Ixx*Iyy - Ixy*Ixy
+
+    # compute eigenvalues
+    val1 = 0.5 * (trace + np.sqrt(trace**2 - 4*det))
+    val2 = 0.5 * (trace - np.sqrt(trace**2 - 4*det))
+
+    # first eigenvector
+    u1 = val1 - Iyy
+    u2 = Ixy
+    u_mag = np.sqrt(u1**2 + u2**2)
+    u1 = u1 / u_mag
+    u2 = u2 / u_mag
+
+    # second eigenvector
+    v1 = val2 - Iyy
+    v2 = Ixy
+    v_mag = np.sqrt(v1**2 + v2**2)
+    v1 = v1 / v_mag
+    v2 = v2 / v_mag
+
+    if weighted:
+        mask = val1 == val2
+
+        linearity = val1-val2 / val1
+        alpha = 0.01
+        lam1 = alpha
+        lam2 = alpha + (1-alpha)*np.exp(-1./linearity**2)
+        lam_sum = lam1 + lam2
+
+        lam1 = lam1 / lam_sum
+        lam2 = lam2 / lam_sum
+
+        lam1[mask] = 0.5
+        lam2[mask] = 0.5
+
+    else:
+        lam1 = 0.05
+        lam2 = 0.95
+
+    d11 = lam1 * u1 * u1 + lam2 * v1 * v1
+    d12 = lam1 * u1 * u2 + lam2 * v1 * v2
+    d22 = lam1 * u2 * u2 + lam2 * v2 * v2
+
+    return d11, d12, d22
+
+def _get_diffusion_tensor_ref(Ixx, Ixy, Iyy, weighted=False):
+
+    ny, nx = Ixx.shape
+    
+    # Initialize diffusion tensor components
+    d11 = np.zeros((ny, nx))
+    d12 = np.zeros((ny, nx))
+    d22 = np.zeros((ny, nx))
+
+    for i in range(ny):
+        for j in range(nx):
+            A = [[Ixx[i, j], Ixy[i, j]], [Ixy[i, j], Iyy[i, j]]]
+            vals, vecs = eigsorted(A)
+
+            alpha = 0.01
+            if weighted:
+                if vals[0] == vals[1]:
+                    lam1 = 0.5
+                    lam2 = 0.5
+                else:
+                    linearity = vals[0] - vals[1] / vals[0]
+                    lam1 = alpha
+                    lam2 = alpha + (1-alpha)*np.exp(-1./linearity**2)
+
+                    lam_sum = lam1 + lam2
+
+                    lam1 /= lam_sum
+                    lam2 /= lam_sum
+            else: 
+                lam1 = 0.05
+                lam2 = 0.95
+
+            # eigen-decomposition of diffusion tensor
+            D = lam1 * np.outer(vecs[:, 0], vecs[:, 0]) + \
+                lam2 * np.outer(vecs[:, -1], vecs[:, -1])
+
+            # Assign components
+            d11[i][j] = D[0][0]
+            d12[i][j] = D[0][1]
+            d22[i][j] = D[1][1]
+
+
+    return d11, d12, d22
