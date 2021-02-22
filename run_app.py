@@ -28,7 +28,7 @@ external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 markdown_intro = '''
 ### An anisotropic image smoother
 
-Adjust the smoothing parameter to increase (or decrease) smoothing. 
+Adjust the smoothing parameter to increase (or decrease) smoothing.
 The leftmost image is the original image, the middle is the image after
 isotropic smoothing and the rightmost image is the anisotropically smoothed image.
 '''
@@ -144,7 +144,7 @@ def load_image(contents):
 def downsize_image(image, max_height, max_width):
 
     height, width = image.shape[:2]
-    
+
     if height > width:
         scaling_factor = max_height / float(height)
     else:
@@ -155,4 +155,4 @@ def downsize_image(image, max_height, max_width):
     return image
 
 if __name__ == '__main__':
-    app.run_server(debug=True)
+    app.run_server(host='0.0.0.0', port=8050, debug=True)
